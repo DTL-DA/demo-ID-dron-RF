@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1520">
+  <title>Demo de identificación del tipo de dron por RF</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1520'/%3E%3Cpath d='M6 22 Q11 8 16 16 T26 10' stroke='%233fd0c9' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <header class="cabecera">
+    <p class="sobretitulo">Demo de identificación · DRFF-R2 · 5,745 GHz</p>
+    <h1>¿Qué tipo de dron es?</h1>
+    <p class="bajada">El modelo propuesto, <b>MobileNetV3-Small + regresión logística</b>, corre aquí, en el procesador
+      de tu celular. Elige una captura de RF y el modelo identifica el tipo de dron entre mavicAir2, mavicAir2s y mini4PRO.</p>
+  </header>
+
+  <!-- 1. Estado del modelo -->
+  <section class="tarjeta" id="estado" aria-live="polite">
+    <h2><span class="paso">1</span> El modelo en tu celular</h2>
+    <ul class="lista-estado">
+      <li id="e-red"><span class="punto"></span><span>Red MobileNetV3-Small (ONNX, <span id="tam-red">3,7 MB</span>)</span></li>
+      <li id="e-huella"><span class="punto"></span><span>Huella SHA-256 calculada en tu celular <code id="huella">…</code></span></li>
+      <li id="e-motor"><span class="punto"></span><span>Motor onnxruntime-web (WebAssembly, ~15 MB la primera vez)</span></li>
+      <li id="e-pliegues"><span class="punto"></span><span>Regresiones logísticas de los 20 pliegues</span></li>
+    </ul>
+    <p class="nota" id="dispositivo"></p>
+    <p class="error" id="error-carga" hidden></p>
+  </section>
+
+  <!-- 2. Elegir y correr -->
+  <section class="tarjeta" id="elegir">
+    <h2><span class="paso">2</span> Elige una captura</h2>
+    <p class="nota">113 capturas de 20 drones. Cada una se clasifica con el modelo del pliegue que dejó fuera a su dron:
+      el modelo nunca vio ese dron al entrenar.</p>
+    <div class="campos">
+      <label>Dron
+        <select id="sel-dron" disabled></select>
+      </label>
+      <label>Captura <small>(canal · receptor · día)</small>
+        <select id="sel-captura" disabled></select>
+      </label>
+    </div>
+    <div class="botones">
+      <button id="btn-azar" class="secundario" disabled>Al azar</button>
+      <button id="btn-correr" class="principal" disabled>Identificar</button>
+    </div>
+  </section>
+
+  <!-- 3. Resultado -->
+  <section class="tarjeta" id="resultado" hidden>
+    <h2><span class="paso">3</span> Lo que calculó tu celular</h2>
+    <div class="espectro">
+      <figure>
+        <canvas id="lienzo" width="224" height="224" aria-label="Espectrograma del segmento actual"></canvas>
+        <figcaption id="pie-espectro">Segmento 1 de 17 · 80 ms</figcaption>
+      </figure>
+      <div class="segmentos">
+        <p class="rotulo">Probabilidad por segmento</p>
+        <div id="barras-segmentos" class="barras-segmentos"></div>
+        <p class="leyenda" id="leyenda"></p>
+        <p class="nota" id="tiempo"></p>
+      </div>
+    </div>
+    <div id="decision" class="decision" hidden>
+      <p class="rotulo">Decisión de la captura (promedio de las log-probabilidades de los 17 segmentos)</p>
+      <div id="barras-decision"></div>
+      <p id="veredicto" class="veredicto"></p>
+      <div class="comparacion" id="comparacion"></div>
+      <details>
+        <summary id="txt-pliegue">Modelo del pliegue</summary>
+        <p class="nota">Drones con los que se entrenó la regresión de este pliegue:</p>
+        <ul id="lista-entreno" class="lista-entreno"></ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- 4. Evaluar las 113 -->
+  <section class="tarjeta" id="todas">
+    <h2><span class="paso">4</span> Evaluar las 113 capturas</h2>
+    <p class="nota">Clasifica todas las capturas en tu celular, cada una con su pliegue, y calcula las métricas de la
+      Tabla III del artículo. Descarga <b id="mb-total">53 MB</b>; conviene hacerlo con wifi.</p>
+    <div class="botones">
+      <button id="btn-todas" class="principal" disabled>Evaluar las 113</button>
+      <button id="btn-parar" class="secundario" hidden>Detener</button>
+    </div>
+    <div id="progreso-todas" hidden>
+      <div class="progreso"><div id="barra-todas"></div></div>
+      <p class="nota" id="txt-todas"></p>
+    </div>
+    <div id="metricas" hidden></div>
+  </section>
+
+  <!-- 5. Código -->
+  <section class="tarjeta" id="codigo">
+    <h2><span class="paso">5</span> El código que corre</h2>
+    <p class="nota">Lo que se muestra aquí es el mismo archivo que tu celular acaba de ejecutar: la página lo lee de sí
+      misma, no es una copia.</p>
+    <div class="pestanas" role="tablist">
+      <button role="tab" aria-selected="true" data-archivo="modelo.js" data-lenguaje="js">En tu celular · modelo.js</button>
+      <button role="tab" aria-selected="false" data-archivo="codigo/modelo_demo.py" data-lenguaje="py">Entrenamiento · Python</button>
+    </div>
+    <div class="botones">
+      <button id="btn-ir-modelo" class="secundario">Ir al modelo propuesto</button>
+      <button id="btn-ajustar" class="secundario" aria-pressed="true">Ajustar líneas</button>
+    </div>
+    <pre id="visor" class="visor ajustar" tabindex="0"><code>Cargando…</code></pre>
+    <p class="nota"><a class="enlace" href="modelo/pliegues.json" target="_blank" rel="noopener">Coeficientes de los
+      20 pliegues (JSON)</a> · <a class="enlace" href="modelo/mobilenet_v3_small_rasgos.onnx" download>Red (ONNX)</a></p>
+  </section>
+
+  <section class="tarjeta alcance">
+    <h2>Alcance de la demo</h2>
+    <ul>
+      <li>Tu celular recibe el espectrograma ya calculado: los índices de color de cada segmento de 80 ms. La señal de RF
+        cruda pesa cerca de 1 GB por captura y no se descarga. Desde la imagen hasta la decisión, todo corre aquí.</li>
+      <li>Es identificación entre tres tipos de dron conocidos (conjunto cerrado): no detecta si hay un dron ni reconoce
+        tipos nuevos.</li>
+      <li>Las capturas son de vuelo estacionario, grabadas a 5,745 GHz. Datos: DRFF-R2 (Zheng et al., 2026), CC BY 4.0.</li>
+    </ul>
+  </section>
+
+  <footer>Donny Torres · Maestría en Analítica de Datos, Universidad del Norte · 2026</footer>
+</main>
+
+<script src="vendor/ort.wasm.min.js"></script>
+<script type="module" src="interfaz.js"></script>
+</body>
+</html>
